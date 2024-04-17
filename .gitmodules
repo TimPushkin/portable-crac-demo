@@ -1,0 +1,4 @@
+[submodule "apps/example-jetty"]
+	path = apps/example-jetty
+	url = https://github.com/TimPushkin/example-jetty.git
+	branch = portable

@@ -2,89 +2,89 @@
 
 Demonstrates how the experimental portable mode of CRaC can be used to transfer
 the state of a running JVM app between machines with different OSes and CPU
-architectures.
+architectures: the repository contains several example applications and
+containerized environments to run them.
 
-The repository contains several example applications and two containerized
-environments to transfer the apps between:
+When cloning make sure to use `--recurse-submodules` to include the submodules.
 
-- Source: Ubuntu 22.04 on AArch64
-- Target: Alpine Linux 3.19 on x86-64
+## Prerequisites
 
-*Source* is intended for checkpointing while *target* is for restoring, though
-everything should also work when used the other way around.
+You will need the following on your host system:
 
-## Requirements
-
-- x86-64 CPU
-    - Currently the source environment (AArch64) is emulated while the target
-      one (x86-64) is run directly on the hardware
-    - The CPU should be powerful enough to run AArch64 emulation, for reference,
-      AMD Ryzen 5 5600X delivered a pleasant experience during the development
-- Docker
-- JDK and Maven (to build the example apps, CRaC JDK is not required)
+- [Docker](https://docs.docker.com/get-docker/) — to use the containerized
+  environments
+    - CPU emulation must be supported: recent Docker Desktop versions should
+      include it by default but if you use just Docker Engine you will probably
+      need to also install [QEMU](https://www.qemu.org/download/) (user mode
+      emulation is sufficient)
+    - You can test the emulation support by executing
+      `docker run --platform linux/$ARCH hello-world` with `$ARCH` different
+      from the host architecture (e.g. `arm64` if the host is x86 and `amd64` if
+      it is ARM): if it succeeds then you are good to go but if you get
+      `exec format error` then you need to configure your Docker
+- [JDK 14+](https://www.java.com/en/download/help/download_options.html) and
+  [Maven](https://maven.apache.org/download.cgi) — to build the example apps
+    - The JDK does not have to be a CRaC JDK
 
 ## How to run
 
-When cloning make sure to use `--recurse-submodules` to include the submodules,
-then follow the steps below to run the demo. Steps 2-4 are given for
-`example-jetty` but should be similar for the rest of the example apps
+In this example we will checkpoint `example-jetty` in `Ubuntu/arm64` and restore
+it in `Alpine Linux/amd64`. The process should be similar for other apps and
+platforms.
 
-1. Build Docker images for the source and target environments, this should take
-   about 20 minutes in total:
+1. Download Docker images from
+   [GitHub releases](https://github.com/TimPushkin/portable-crac-demo/releases)
+   and load them by executing these commands in the directory you have
+   placed them (don't forget to set `$VER`):
    ```shell
-   docker build -t demo-source -f docker/source.Dockerfile .
-   docker build -t demo-target -f docker/target.Dockerfile .
+   docker load --input crac-ubuntu-arm64_$VER.tar.gz
+   docker load --input crac-alpine-amd64_$VER.tar.gz
    ```
-2. Compile the example app you plan to run:
+    - To try different CPU architectures build the images manually following the
+      instructions in [`docker/README.md`](docker/README.md) — the build process
+      is very simple but may take tens of minutes
+2. Compile the example app. In the repository's root execute:
    ```shell
    cd apps/example-jetty
    mvn package
    ```
 3. Checkpoint:
-    1. Start the source container:
+    1. Start the first container. In the repository's root execute:
        ```shell
        docker run -it \
+         --platform linux/arm64 \
          --mount "src=$PWD/apps/example-jetty,dst=/app,type=bind" \
          -p 8080:8080 \
-         demo-source
+         crac-ubuntu-arm64:$VER
        ```
-        - Mounted `src` should point wherever the app is and `dst` must
-          be `/app`
-        - The port is forwarded to be able to access the Jetty server from the
-          host machine (other example apps do not need this), the source can be
-          an arbitrary port and the target must be `8080`
-    2. Wait for the emulator to boot (should take 1-2 minutes), then sign in
-       with login `ubuntu` and password `1234`.
-        - Before trying to sign in wait for
-          `[  OK  ] Reached target Cloud-init target.` message to appear: it
-          will probably happen some time after the login screen appears — if the
-          credentials are invalid you most likely just have not waited enough
-        - Inside the emulator TTY may be acting weird, you can optionally fix
-          this by calling `stty cols $COLS rows $ROWS` and specifying the number
-          of columns and rows in your terminal
-    3. Launch the app using CRaC JDK in `$JAVA_HOME` and checkpoint it to `/cr`:
+        - Inside the container our app will be available at `/app`
+        - We will need TCP port `8080` to access the Jetty server on the host
+    2. Inside the container, launch the app using CRaC JDK in `$JAVA_HOME` and
+       checkpoint it to `/cr`:
        ```shell
        $JAVA_HOME/bin/java -XX:CREngine="" -XX:CRaCCheckpointTo=/cr \
          -Djdk.crac.resource-policies=/app/res-policies.yaml \
          -jar /app/target/example-jetty-1.0-SNAPSHOT.jar
        ```
         - `/cr` is a volume configured to be shared between the containers
-        - The Jetty server can be accessed at `localhost:8080`, sending a
-          request to `localhost:8080/checkpoint` will make it checkpoint
-    4. To stop the container press `Ctrl-A` followed by `X`.
+        - First query the Jetty server at `localhost:8080` to warm it up and
+          then make it checkpoint by sending a request to
+          `localhost:8080/checkpoint`
+        - You can exit the container when you are done
 4. Restore:
-    1. Start the target container:
+    1. Start the second container. In the repository's root execute:
        ```shell
        docker run -it \
+         --platform linux/amd64 \
          --volumes-from "$(docker ps -ql)" \
          --mount "src=$PWD/apps/example-jetty,dst=/app,type=bind" \
          -p 8080:8080 \
-         demo-target
+         crac-alpine-amd64:$VER
        ```
-        - `--volumes-from` makes `/cr` from the source available to the target
-        - Same rules apply to the mount and port here as with the source
-          container
-    2. Restore the checkpointed app using CRaC JDK in `$JAVA_HOME`:
+        - `--volumes-from` makes `/cr` from the first container available
+          inside this new container
+    2. Inside the container, restore the checkpointed app using CRaC JDK in
+       `$JAVA_HOME`:
        ```shell
        $JAVA_HOME/bin/java -XX:CREngine="" -XX:CRaCRestoreFrom=/cr \
          -Djdk.crac.resource-policies=/app/res-policies.yaml \
@@ -92,4 +92,3 @@ then follow the steps below to run the demo. Steps 2-4 are given for
        ```
         - The restored Jetty server should again be accessible
           at `localhost:8080`
-    3. To stop the container press `Ctrl-C` and then type `exit`.

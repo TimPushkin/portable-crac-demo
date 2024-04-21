@@ -63,13 +63,14 @@ platforms.
        ```shell
        $JAVA_HOME/bin/java -XX:CREngine="" -XX:CRaCCheckpointTo=/cr \
          -Djdk.crac.resource-policies=/app/res-policies.yaml \
+         -Dport=8080 \
          -jar /app/target/example-jetty-1.0-SNAPSHOT.jar
        ```
         - `/cr` is a volume configured to be shared between the containers
         - First query the Jetty server at `localhost:8080` to warm it up and
           then make it checkpoint by sending a request to
           `localhost:8080/checkpoint`
-        - You can exit the container when you are done
+        - The server will continue running, stop it when you wish
 4. Restore:
     1. Start the second container. In the repository's root execute:
        ```shell
@@ -77,17 +78,18 @@ platforms.
          --platform linux/amd64 \
          --volumes-from "$(docker ps -ql)" \
          --mount "src=$PWD/apps/example-jetty,dst=/app,type=bind" \
-         -p 8080:8080 \
+         -p 8081:8081 \
          crac-alpine-amd64
        ```
         - `--volumes-from` makes `/cr` from the first container available
           inside this new container
+        - For a change, we will use port `8081` this time
     2. Inside the container, restore the checkpointed app using CRaC JDK in
        `$JAVA_HOME`:
        ```shell
        $JAVA_HOME/bin/java -XX:CREngine="" -XX:CRaCRestoreFrom=/cr \
          -Djdk.crac.resource-policies=/app/res-policies.yaml \
+         -Dport=8081 \
          -jar /app/target/example-jetty-1.0-SNAPSHOT.jar
        ```
-        - The restored Jetty server should again be accessible
-          at `localhost:8080`
+        - The restored Jetty server should become accessible at `localhost:8081`

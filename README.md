@@ -34,11 +34,10 @@ platforms.
 
 1. Download Docker images from
    [GitHub releases](https://github.com/TimPushkin/portable-crac-demo/releases)
-   and load them by executing these commands in the directory you have
-   placed them (don't forget to set `$VER`):
+   and load them by executing these commands:
    ```shell
-   docker load --input crac-ubuntu-arm64_$VER.tar.gz
-   docker load --input crac-alpine-amd64_$VER.tar.gz
+   docker load --input crac-ubuntu-arm64.tar.gz
+   docker load --input crac-alpine-amd64.tar.gz
    ```
     - To try different CPU architectures build the images manually following the
       instructions in [`docker/README.md`](docker/README.md) — the build process
@@ -55,7 +54,7 @@ platforms.
          --platform linux/arm64 \
          --mount "src=$PWD/apps/example-jetty,dst=/app,type=bind" \
          -p 8080:8080 \
-         crac-ubuntu-arm64:$VER
+         crac-ubuntu-arm64
        ```
         - Inside the container our app will be available at `/app`
         - We will need TCP port `8080` to access the Jetty server on the host
@@ -79,7 +78,7 @@ platforms.
          --volumes-from "$(docker ps -ql)" \
          --mount "src=$PWD/apps/example-jetty,dst=/app,type=bind" \
          -p 8080:8080 \
-         crac-alpine-amd64:$VER
+         crac-alpine-amd64
        ```
         - `--volumes-from` makes `/cr` from the first container available
           inside this new container

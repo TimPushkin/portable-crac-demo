@@ -5,11 +5,13 @@ the state of a running JVM app between machines with different OSes and CPU
 architectures: the repository contains several example applications and
 containerized environments to run them.
 
-When cloning make sure to use `--recurse-submodules` to include the submodules.
+[Demo](https://github.com/TimPushkin/portable-crac-demo/assets/71890197/db9cd864-3fde-4b40-87d3-66033b2ab32a)
 
 ## Prerequisites
 
-You will need the following on your host system:
+When cloning make sure to use `--recurse-submodules` to include the submodules.
+
+You will also need the following on your host system:
 
 - [Docker](https://docs.docker.com/get-docker/) — to use the containerized
   environments
